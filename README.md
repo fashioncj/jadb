@@ -13,7 +13,7 @@ This projects aims at providing an up to date implementation of the ADB protocol
 Usage cannot be simpler. Just create a `JadbConnection` and off you go.
 
     JadbConnection jadb = new JadbConnection();
-	List<JadbDevice> devices = jadb.getDevices();
+    List<JadbDevice> devices = jadb.getDevices();
 
 Make sure the adb server is running. You can start it by running `adb` once from the command line.
 
@@ -35,5 +35,42 @@ A list of the available commands that a ADB Server may accept can be found here:
 [Services](https://github.com/cgjones/android-system-core/blob/master/adb/SERVICES.TXT)
 
 
-## Author ##
+## Using JADB in your application ##
+
+Since version v1.1 Jadb support [maven](https://maven.apache.org/) as a build system. Although this project is not presented in official apache maven 
+repositories this library can be used as dependencies in your maven/gradle project with the help of [jitpack](https://jitpack.io). 
+[Jitpack](https://jitpack.io) is a system which parses github public repositories and make artifacts from them. 
+You only need to add [jitpack](https://jitpack.io) as a repository to let maven/gradle to search for artifacts in it, like so
+
+```
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+```
+ 
+After that you will need to add actual dependency. [Jitpack](https://jitpack.io) takes groupId, artifactId and version id from repository name, 
+project name and tag ignoring actual values from pom.xml. So you need to write:
+ 
+```
+<dependency>
+    <groupId>com.github.vidstige</groupId>
+    <artifactId>jadb</artifactId>
+    <version>v1.1</version>
+</dependency>
+```
+
+## Contributing ##
+This project would not be where it is, if it where not for the helpful [contributors](https://github.com/vidstige/jadb/graphs/contributors)
+supporting jadb with pull requests, issue reports, and great ideas. If _you_ would like to
+contribute, please read through [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Authors ##
 Samuel Carlsson <samuel.carlsson@gmai.com>
+
+See [contributors](https://github.com/vidstige/jadb/graphs/contributors) for a full list.
+
+## License ##
+This project is released under the Apache License Version 2.0, see [LICENSE.md](LICENSE.md) for more information.
