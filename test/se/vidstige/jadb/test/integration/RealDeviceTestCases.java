@@ -1,5 +1,6 @@
 package se.vidstige.jadb.test.integration;
 
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -7,11 +8,17 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import se.vidstige.jadb.*;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
 import java.util.List;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class RealDeviceTestCases {
 
@@ -23,10 +30,8 @@ public class RealDeviceTestCases {
     @BeforeClass
     public static void tryToStartAdbServer() {
         try {
-            new AdbServerLauncher().launch();
-        } catch (IOException e) {
-            System.out.println("Could not start adb-server");
-        } catch (InterruptedException e) {
+            new AdbServerLauncher(new Subprocess(), System.getenv()).launch();
+        } catch (IOException | InterruptedException e) {
             System.out.println("Could not start adb-server");
         }
     }
@@ -49,6 +54,7 @@ public class RealDeviceTestCases {
     @Test
     public void testGetDevices() throws Exception {
         List<JadbDevice> actual = jadb.getDevices();
+        Assert.assertNotNull(actual);
         //Assert.assertEquals("emulator-5554", actual.get(0).getSerial());
     }
 
@@ -92,23 +98,58 @@ public class RealDeviceTestCases {
         any.pull(new RemoteFile("/file/does/not/exist"), temporaryFolder.newFile("xyz"));
     }
 
-    @Test
+    @SuppressWarnings("deprecation")
+	@Test
     public void testShellExecuteTwice() throws Exception {
         JadbDevice any = jadb.getAnyDevice();
-        any.executeShell(System.out, "ls /");
-        any.executeShell(System.out, "ls", "-la", "/");
+        ByteArrayOutputStream bout = new ByteArrayOutputStream();
+        any.executeShell(bout, "ls /");
+        any.executeShell(bout, "ls", "-la", "/");
+        System.out.write(bout.toByteArray());
     }
 
     @Test
     public void testScreenshot() throws Exception {
         JadbDevice any = jadb.getAnyDevice();
-        FileOutputStream outputStream = null;
-        try {
-            outputStream = new FileOutputStream(temporaryFolder.newFile("screenshot.png"));
+        try (FileOutputStream outputStream = new FileOutputStream(temporaryFolder.newFile("screenshot.png"))) {
             InputStream stdout = any.executeShell("screencap", "-p");
             Stream.copy(stdout, outputStream);
-        }  finally {
-            if (outputStream != null) outputStream.close();
         }
+    }
+
+    /**
+     * This test requires emulator running on non-standard tcp port - this may be achieve by executing such command:
+     * ${ANDROID_HOME}/emulator -verbose -avd ${NAME} -ports 10000,10001
+     *
+     * @throws IOException
+     * @throws JadbException
+     * @throws ConnectionToRemoteDeviceException
+     */
+    @Test
+    public void testConnectionToTcpDevice() throws IOException, JadbException, ConnectionToRemoteDeviceException {
+        jadb.connectToTcpDevice(new InetSocketAddress("127.0.0.1", 10001));
+        List<JadbDevice> devices = jadb.getDevices();
+
+        assertNotNull(devices);
+        assertFalse(devices.isEmpty());
+    }
+
+    /**
+     * @see #testConnectionToTcpDevice()
+     *
+     * @throws IOException
+     * @throws JadbException
+     * @throws ConnectionToRemoteDeviceException
+     */
+    @Test
+    public void testDisconnectionToTcpDevice() throws IOException, JadbException, ConnectionToRemoteDeviceException {
+        testConnectionToTcpDevice();
+
+        jadb.disconnectFromTcpDevice(new InetSocketAddress("127.0.0.1", 10001));
+        jadb.getDevices();
+
+        List<JadbDevice> devices = jadb.getDevices();
+        assertNotNull(devices);
+        assertTrue(devices.isEmpty());
     }
 }

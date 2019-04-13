@@ -1,38 +1,50 @@
-#JADB#
+# JADB #
 ADB client implemented in pure Java.
 
-The Android Debug Bridge or ADB for short it a client-server architecture used to install android apps from an IDE or command line and to debug apps, etc.
+The Android Debug Bridge (ADB) is a client-server architecture used to communicate with Android devices (install APKs, debug apps, etc).
 
-The Android SDK Tools is available for the major platforms (Mac, Windows & Linux) and in there is a command line tool called adb that implements the ADB protocol.
+The Android SDK Tools are available for the major platforms (Mac, Windows & Linux) and include the `adb` command line tool which implements the ADB protocol.
 
 This projects aims at providing an up to date implementation of the ADB protocol.
 
 [![Build Status](https://travis-ci.org/vidstige/jadb.svg?branch=master)](https://travis-ci.org/vidstige/jadb)
+[![](https://jitpack.io/v/vidstige/jadb.svg)](https://jitpack.io/#vidstige/jadb)
+[![codecov](https://codecov.io/gh/vidstige/jadb/branch/master/graph/badge.svg)](https://codecov.io/gh/vidstige/jadb)
+[![](http://img.shields.io/badge/first--timers--only-friendly-green.svg?style=flat&colorB=FF69B4)](http://www.firsttimersonly.com/)
+
 
 ## Example ##
 Usage cannot be simpler. Just create a `JadbConnection` and off you go.
 
-    JadbConnection jadb = new JadbConnection();
-    List<JadbDevice> devices = jadb.getDevices();
+```java
+JadbConnection jadb = new JadbConnection();
+List<JadbDevice> devices = jadb.getDevices();
+```
 
 Make sure the adb server is running. You can start it by running `adb` once from the command line.
 
 It's very easy to send and receive files from your android device, for example as below.
 
-    JadbDevice device = ...
-    device.pull(new RemoteFile("/path/to/file.txt"), new File("file.txt"));
+```java
+JadbDevice device = ...
+device.pull(new RemoteFile("/path/to/file.txt"), new File("file.txt"));
+```
 
 Some high level operations such as installing and uninstalling packages are also available.
 
-    JadbDevice device = ...
-    new PackageManager(device).install(new File("/path/to/my.apk"));
+```java
+JadbDevice device = ...
+new PackageManager(device).install(new File("/path/to/my.apk"));
+```
 
 ## Protocol Description ##
 
-An overview of the protocol can be found here: [Overview](https://github.com/cgjones/android-system-core/blob/master/adb/OVERVIEW.TXT)
+An overview of the protocol can be found here: [Overview](https://android.googlesource.com/platform/system/adb/+/master/OVERVIEW.TXT)
 
 A list of the available commands that a ADB Server may accept can be found here:
-[Services](https://github.com/cgjones/android-system-core/blob/master/adb/SERVICES.TXT)
+[Services](https://android.googlesource.com/platform/system/adb/+/master/SERVICES.TXT)
+
+The description for the protocol for transferring files can be found here: [SYNC.TXT](https://android.googlesource.com/platform/system/adb/+/master/SYNC.TXT).
 
 
 ## Using JADB in your application ##
@@ -58,8 +70,23 @@ project name and tag ignoring actual values from pom.xml. So you need to write:
 <dependency>
     <groupId>com.github.vidstige</groupId>
     <artifactId>jadb</artifactId>
-    <version>v1.1</version>
+    <version>v1.1.0</version>
 </dependency>
+```
+
+## Troubleshooting
+If you cannot connect to your device check the following.
+
+- Your adb server is running by issuing `adb start-server`
+- You can see the device using adb `adb devices`
+
+If you see the device in `adb` but not in `jadb` please file an issue on https://github.com/vidstige/jadb/.
+
+### Workaround for Unix Sockets Adb Server
+
+Install `socat` and issue the following to forward port 5037 to the unix domain socket.
+```bash
+socat TCP-LISTEN:5037,reuseaddr,fork UNIX-CONNECT:/tmp/5037
 ```
 
 ## Contributing ##
@@ -68,7 +95,7 @@ supporting jadb with pull requests, issue reports, and great ideas. If _you_ wou
 contribute, please read through [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Authors ##
-Samuel Carlsson <samuel.carlsson@gmai.com>
+Samuel Carlsson <samuel.carlsson@gmail.com>
 
 See [contributors](https://github.com/vidstige/jadb/graphs/contributors) for a full list.
 

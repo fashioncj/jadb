@@ -6,7 +6,7 @@
 
     <groupId>se.vidstige</groupId>
     <artifactId>jadb</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
     <url>https://github.com/vidstige/jadb</url>
 
     <licenses>
@@ -30,6 +30,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.target>1.7</maven.compiler.target>
         <maven.compiler.source>1.7</maven.compiler.source>
+        <mockito-core.version>2.7.17</mockito-core.version>
     </properties>
 
     <dependencies>
@@ -39,14 +40,43 @@
             <version>4.10</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.mockito/mockito-core -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito-core.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
         <sourceDirectory>src</sourceDirectory>
         <testSourceDirectory>test</testSourceDirectory>
         <plugins>
+            <!-- Version plugin is a plugin which can:
+                  * Create report about all new versions for both code dependencies and maven plugins themselves
+                  * Update them automatically (mvn versions:use-latest-versions and so on)
+
+                 Usage - most commonly used patterns:
+                  * `mvn versions:help` - will show all available tasks for this plugin with short description
+                  * `mvn versions:dependency-updates-report` produces a report of those project dependencies which have newer versions available.
+                     Will be in 'target\site' folder
+                  * `mvn versions:plugin-updates-report` produces a report of those plugins which have newer versions available.
+                     Will be in 'target\site' folder
+                  * `mvn versions:use-latest-versions` searches the pom for all versions which have been a newer version and replaces them with the latest version.
+
+                 For more info see official [documentation](http://www.mojohaus.org/versions-maven-plugin/)
+            -->
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.3</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.5.1</version>
                 <configuration>
                     <source>1.7</source>
                     <target>1.7</target>
@@ -55,7 +85,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>2.1.2</version>
+                <version>3.0.1</version>
                 <executions>
                     <execution>
                         <phase>verify</phase>
@@ -68,7 +98,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-release-plugin</artifactId>
-                <version>2.4.2</version>
+                <version>2.5.3</version>
                 <configuration>
                     <useReleaseProfile>false</useReleaseProfile>
                     <releaseProfiles>release</releaseProfiles>
@@ -84,6 +114,25 @@
                 </dependencies>
             </plugin>
             <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.7.7.201606060606</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.19.1</version>
@@ -92,7 +141,7 @@
                         <include>**/*.java</include>
                     </includes>
                     <excludes>
-                        <!--Integration tests -->
+                        <!--Exclude integration tests -->
                         <exclude>se.vidstige.jadb.test.integration.*</exclude>
                         <!--Mocks and data-->
                         <exclude>**/data/*</exclude>
@@ -109,8 +158,8 @@
                         <include>**/*.java</include>
                     </includes>
                     <excludes>
-                        <!--Integration tests -->
-                        <exclude>se.vidstige.jadb.test.unit.*</exclude>
+                        <!--Include only integration tests -->
+                        <include>se.vidstige.jadb.test.integration.*</include>
                         <!--Mocks and data-->
                         <exclude>**/data/*</exclude>
                         <exclude>**/fakes/*</exclude>
@@ -135,7 +184,6 @@
                 <plugins>
                     <plugin>
                         <artifactId>maven-source-plugin</artifactId>
-                        <version>2.1.2</version>
                         <executions>
                             <execution>
                                 <id>attach-sources</id>

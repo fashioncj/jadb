@@ -6,7 +6,7 @@ import se.vidstige.jadb.RemoteFile;
 import se.vidstige.jadb.Stream;
 
 import java.io.*;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -22,10 +22,8 @@ public class PackageManager {
     }
 
     public List<Package> getPackages() throws IOException, JadbException {
-        ArrayList<Package> result = new ArrayList<Package>();
-        BufferedReader input = null;
-        try {
-            input = new BufferedReader(new InputStreamReader(device.executeShell("pm", "list", "packages"), Charset.forName("UTF-8")));
+        try (BufferedReader input = new BufferedReader(new InputStreamReader(device.executeShell("pm", "list", "packages"), StandardCharsets.UTF_8))) {
+            ArrayList<Package> result = new ArrayList<>();
             String line;
             while ((line = input.readLine()) != null) {
                 final String prefix = "package:";
@@ -33,10 +31,8 @@ public class PackageManager {
                     result.add(new Package(line.substring(prefix.length())));
                 }
             }
-        } finally {
-            if (input != null) input.close();
+            return result;
         }
-        return result;
     }
 
     private String getErrorMessage(String operation, String target, String errorMessage) {
@@ -47,20 +43,20 @@ public class PackageManager {
         if (!result.contains("Success")) throw new JadbException(getErrorMessage(operation, target, result));
     }
 
-    public void remove(RemoteFile file) throws IOException, JadbException {
-        InputStream s = device.executeShell("rm", "-f", Bash.quote(file.getPath()));
-        Stream.readAll(s, Charset.forName("UTF-8"));
+    private void remove(RemoteFile file) throws IOException, JadbException {
+        InputStream s = device.executeShell("rm", "-f", file.getPath());
+        Stream.readAll(s, StandardCharsets.UTF_8);
     }
 
     private void install(File apkFile, List<String> extraArguments) throws IOException, JadbException {
         RemoteFile remote = new RemoteFile("/sdcard/tmp/" + apkFile.getName());
         device.push(apkFile, remote);
-        ArrayList<String> arguments = new ArrayList<>();
+        List<String> arguments = new ArrayList<>();
         arguments.add("install");
         arguments.addAll(extraArguments);
         arguments.add(remote.getPath());
-        InputStream s = device.executeShell("pm", arguments.toArray(new String[arguments.size()]));
-        String result = Stream.readAll(s, Charset.forName("UTF-8"));
+        InputStream s = device.executeShell("pm", arguments.toArray(new String[0]));
+        String result = Stream.readAll(s, StandardCharsets.UTF_8);
         remove(remote);
         verifyOperation("install", apkFile.getName(), result);
     }
@@ -84,23 +80,26 @@ public class PackageManager {
 
     public void uninstall(Package name) throws IOException, JadbException {
         InputStream s = device.executeShell("pm", "uninstall", name.toString());
-        String result = Stream.readAll(s, Charset.forName("UTF-8"));
+        String result = Stream.readAll(s, StandardCharsets.UTF_8);
         verifyOperation("uninstall", name.toString(), result);
     }
 
     public void launch(Package name) throws IOException, JadbException {
         InputStream s = device.executeShell("monkey", "-p", name.toString(), "-c", "android.intent.category.LAUNCHER", "1");
+        s.close();
     }
 
     //<editor-fold desc="InstallOption">
     public static class InstallOption {
+        private final StringBuilder stringBuilder = new StringBuilder();
+
         InstallOption(String ... varargs) {
+            String suffix = "";
             for(String str: varargs) {
-                stringBuilder.append(str).append(" ");
+                stringBuilder.append(suffix).append(str);
+                suffix = " ";
             }
         }
-
-        private final StringBuilder stringBuilder = new StringBuilder();
 
         private String getStringRepresentation() {
             return stringBuilder.toString();
@@ -115,15 +114,18 @@ public class PackageManager {
     public static final InstallOption ALLOW_TEST_APK =
             new InstallOption("-t");
 
+    @SuppressWarnings("squid:S00100")
     public static InstallOption WITH_INSTALLER_PACKAGE_NAME(String name)
     {
         return new InstallOption("-t", name);
     }
 
+    @SuppressWarnings("squid:S00100")
     public static InstallOption ON_SHARED_MASS_STORAGE(String name) {
         return new InstallOption("-s", name);
     }
 
+    @SuppressWarnings("squid:S00100")
     public static InstallOption ON_INTERNAL_SYSTEM_MEMORY(String name) {
         return new InstallOption("-f", name);
     }
@@ -132,7 +134,7 @@ public class PackageManager {
             new InstallOption("-d");
 
     /**
-     * This option is sSupported only from Android 6.X+
+     * This option is supported only from Android 6.X+
      */
     public static final InstallOption GRANT_ALL_PERMISSIONS = new InstallOption("-g");
 

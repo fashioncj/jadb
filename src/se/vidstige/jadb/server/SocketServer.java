@@ -22,20 +22,21 @@ public abstract class SocketServer implements Runnable {
         thread = new Thread(this, "Fake Adb Server");
         thread.setDaemon(true);
         thread.start();
-        serverReady();
+        waitForServer();
     }
 
     public int getPort() {
         return port;
     }
 
+    @SuppressWarnings("squid:S2189") // server is stopped by closing SocketServer
     @Override
     public void run() {
         try {
             socket = new ServerSocket(port);
             socket.setReuseAddress(true);
 
-            waitForServer();
+            serverReady();
 
             while (true) {
                 Socket c = socket.accept();
@@ -44,21 +45,22 @@ public abstract class SocketServer implements Runnable {
                 clientThread.start();
             }
         } catch (IOException e) {
+            // Empty on purpose
         }
     }
 
-    private void serverReady() throws InterruptedException {
+    private void serverReady() {
         synchronized (lockObject) {
-            if (!isStarted) {
+            isStarted = true;
+            lockObject.notifyAll();
+        }
+    }
+
+    private void waitForServer() throws InterruptedException {
+        synchronized (lockObject) {
+            while (!isStarted) {
                 lockObject.wait();
             }
-        }
-    }
-
-    private void waitForServer() {
-        synchronized (lockObject) {
-            lockObject.notify();
-            isStarted = true;
         }
     }
 

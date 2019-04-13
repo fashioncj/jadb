@@ -2,16 +2,20 @@ package se.vidstige.jadb;
 
 import java.io.*;
 import java.net.Socket;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
-class Transport {
+class Transport implements Closeable {
 
     private final OutputStream outputStream;
     private final InputStream inputStream;
+    private final DataInputStream dataInput;
+    private final DataOutputStream dataOutput;
 
     private Transport(OutputStream outputStream, InputStream inputStream) {
         this.outputStream = outputStream;
         this.inputStream = inputStream;
+        this.dataInput = new DataInputStream(inputStream);
+        this.dataOutput = new DataOutputStream(outputStream);
     }
 
     public Transport(Socket socket) throws IOException {
@@ -41,18 +45,17 @@ class Transport {
     }
 
     public String readString(int length) throws IOException {
-        DataInput reader = new DataInputStream(inputStream);
         byte[] responseBuffer = new byte[length];
-        reader.readFully(responseBuffer);
-        return new String(responseBuffer, Charset.forName("utf-8"));
+        dataInput.readFully(responseBuffer);
+        return new String(responseBuffer, StandardCharsets.UTF_8);
     }
 
-    public String getCommandLength(String command) {
+    private String getCommandLength(String command) {
         return String.format("%04x", command.length());
     }
 
     public void send(String command) throws IOException {
-        OutputStreamWriter writer = new OutputStreamWriter(outputStream);
+        OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
         writer.write(getCommandLength(command));
         writer.write(command);
         writer.flush();
@@ -61,11 +64,12 @@ class Transport {
     public SyncTransport startSync() throws IOException, JadbException {
         send("sync:");
         verifyResponse();
-        return new SyncTransport(outputStream, inputStream);
+        return new SyncTransport(dataOutput, dataInput);
     }
 
+    @Override
     public void close() throws IOException {
-        inputStream.close();
-        outputStream.close();
+        dataInput.close();
+        dataOutput.close();
     }
 }

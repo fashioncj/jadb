@@ -7,10 +7,13 @@ import se.vidstige.jadb.server.AdbResponder;
 import se.vidstige.jadb.server.AdbServer;
 
 import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ProtocolException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -18,7 +21,7 @@ import java.util.List;
  */
 public class FakeAdbServer implements AdbResponder {
     private final AdbServer server;
-    private List<DeviceResponder> devices = new ArrayList<DeviceResponder>();
+    private final List<DeviceResponder> devices = new ArrayList<>();
 
     public FakeAdbServer(int port) {
         server = new AdbServer(this, port);
@@ -45,7 +48,11 @@ public class FakeAdbServer implements AdbResponder {
     }
 
     public void add(String serial) {
-        devices.add(new DeviceResponder(serial));
+        devices.add(new DeviceResponder(serial, "device"));
+    }
+
+    public void add(String serial, String type) {
+        devices.add(new DeviceResponder(serial, type));
     }
 
     public void verifyExpectations() {
@@ -76,8 +83,16 @@ public class FakeAdbServer implements AdbResponder {
         return findBySerial(serial).expectPull(path);
     }
 
-    public void expectShell(String serial, String commands) {
-        findBySerial(serial).expectShell(commands);
+    public DeviceResponder.ShellExpectation expectShell(String serial, String commands) {
+        return findBySerial(serial).expectShell(commands);
+    }
+
+    public void expectTcpip(String serial, Integer port) {
+        findBySerial(serial).expectTcpip(port);
+    }
+
+    public DeviceResponder.ListExpectation expectList(String serial, String remotePath) {
+        return findBySerial(serial).expectList(remotePath);
     }
 
     @Override
@@ -85,13 +100,17 @@ public class FakeAdbServer implements AdbResponder {
         return new ArrayList<AdbDeviceResponder>(devices);
     }
 
-    private class DeviceResponder implements AdbDeviceResponder {
+    private static class DeviceResponder implements AdbDeviceResponder {
         private final String serial;
-        private List<FileExpectation> fileExpectations = new ArrayList<FileExpectation>();
-        private List<ShellExpectation> shellExpectations = new ArrayList<ShellExpectation>();
+        private final String type;
+        private List<FileExpectation> fileExpectations = new ArrayList<>();
+        private List<ShellExpectation> shellExpectations = new ArrayList<>();
+        private List<ListExpectation> listExpectations = new ArrayList<>();
+        private List<Integer> tcpipExpectations = new ArrayList<>();
 
-        private DeviceResponder(String serial) {
+        private DeviceResponder(String serial, String type) {
             this.serial = serial;
+            this.type = type;
         }
 
         @Override
@@ -101,7 +120,7 @@ public class FakeAdbServer implements AdbResponder {
 
         @Override
         public String getType() {
-            return "device";
+            return type;
         }
 
         @Override
@@ -131,28 +150,54 @@ public class FakeAdbServer implements AdbResponder {
         }
 
         @Override
-        public void shell(String command) throws IOException {
+        public void shell(String command, DataOutputStream stdout, DataInput stdin) throws IOException {
             for (ShellExpectation se : shellExpectations) {
                 if (se.matches(command)) {
                     shellExpectations.remove(se);
-                    se.throwIfFail();
+                    se.writeOutputTo(stdout);
                     return;
                 }
             }
             throw new ProtocolException("Unexpected shell to device " + serial + ": " + command);
         }
 
-        public void verifyExpectations() {
-            org.junit.Assert.assertEquals(0, fileExpectations.size());
+        @Override
+        public void enableIpCommand(String port, DataOutputStream outputStream) throws IOException {
+            for (Integer expectation : tcpipExpectations) {
+                if (expectation == Integer.parseInt(port)) {
+                    tcpipExpectations.remove(expectation);
+                    return;
+                }
+            }
+
+            throw new ProtocolException("Unexpected tcpip to device " + serial + ": (port) " + port);
+
         }
 
-        private class FileExpectation implements ExpectationBuilder {
+        @Override
+        public List<RemoteFile> list(String path) throws IOException {
+            for (ListExpectation le : listExpectations) {
+                if (le.matches(path)) {
+                    listExpectations.remove(le);
+                    return le.getFiles();
+                }
+            }
+            throw new ProtocolException("Unexpected list of device " + serial + " in dir " + path);
+        }
+
+        public void verifyExpectations() {
+            org.junit.Assert.assertEquals(0, fileExpectations.size());
+            org.junit.Assert.assertEquals(0, shellExpectations.size());
+            org.junit.Assert.assertEquals(0, listExpectations.size());
+            org.junit.Assert.assertEquals(0, tcpipExpectations.size());
+        }
+
+        private static class FileExpectation implements ExpectationBuilder {
             private final RemoteFile path;
             private byte[] content;
             private String failMessage;
 
             public FileExpectation(RemoteFile path) {
-
                 this.path = path;
                 content = null;
                 failMessage = null;
@@ -170,7 +215,7 @@ public class FakeAdbServer implements AdbResponder {
 
             @Override
             public void withContent(String content) {
-                this.content = content.getBytes(Charset.forName("utf-8"));
+                this.content = content.getBytes(StandardCharsets.UTF_8);
             }
 
             public boolean matches(RemoteFile path) {
@@ -190,8 +235,9 @@ public class FakeAdbServer implements AdbResponder {
             }
         }
 
-        public class ShellExpectation {
+        public static class ShellExpectation {
             private final String command;
+            private byte[] stdout;
 
             public ShellExpectation(String command) {
                 this.command = command;
@@ -201,9 +247,69 @@ public class FakeAdbServer implements AdbResponder {
                 return command.equals(this.command);
             }
 
-            public void throwIfFail() {
+            public void returns(String stdout) {
+                this.stdout = stdout.getBytes(StandardCharsets.UTF_8);
+            }
+
+            public void writeOutputTo(DataOutputStream stdout) throws IOException {
+                stdout.write(this.stdout);
+            }
+        }
+
+        public static class ListExpectation {
+
+            private final String remotePath;
+            private final List<RemoteFile> files = new ArrayList<>();
+
+            public ListExpectation(String remotePath) {
+                this.remotePath = remotePath;
+            }
+
+            public boolean matches(String remotePath) {
+                return remotePath.equals(this.remotePath);
+            }
+
+            public ListExpectation withFile(String path, int size, int modifyTime) {
+                files.add(new MockFileEntry(path, size, modifyTime, false));
+                return this;
+            }
+
+            public ListExpectation withDir(String path, int modifyTime) {
+                files.add(new MockFileEntry(path, -1, modifyTime, true));
+                return this;
+            }
+
+            public List<RemoteFile> getFiles() {
+                return Collections.unmodifiableList(files);
+            }
+
+            private static class MockFileEntry extends RemoteFile {
+
+                private final int size;
+                private final int modifyTime;
+                private final boolean dir;
+
+                MockFileEntry(String path, int size, int modifyTime, boolean dir) {
+                    super(path);
+                    this.size = size;
+                    this.modifyTime = modifyTime;
+                    this.dir = dir;
+                }
+
+                public int getSize() {
+                    return size;
+                }
+
+                public int getLastModified() {
+                    return modifyTime;
+                }
+
+                public boolean isDirectory() {
+                    return dir;
+                }
 
             }
+
         }
 
         public ExpectationBuilder expectPush(RemoteFile path) {
@@ -220,8 +326,18 @@ public class FakeAdbServer implements AdbResponder {
 
         public ShellExpectation expectShell(String command) {
             ShellExpectation expectation = new ShellExpectation(command);
-            shellExpectations.add(new ShellExpectation(command));
+            shellExpectations.add(expectation);
             return expectation;
+        }
+
+        public ListExpectation expectList(String remotePath) {
+            ListExpectation expectation = new ListExpectation(remotePath);
+            listExpectations.add(expectation);
+            return expectation;
+        }
+
+        public void expectTcpip(int port) {
+            tcpipExpectations.add(port);
         }
     }
 }

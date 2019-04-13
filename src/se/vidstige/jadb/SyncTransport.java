@@ -1,7 +1,7 @@
 package se.vidstige.jadb;
 
 import java.io.*;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Created by vidstige on 2014-03-19.
@@ -11,11 +11,6 @@ public class SyncTransport {
     private final DataOutput output;
     private final DataInput input;
 
-    public SyncTransport(OutputStream outputStream, InputStream inputStream) {
-        output = new DataOutputStream(outputStream);
-        input = new DataInputStream(inputStream);
-    }
-
     public SyncTransport(DataOutput outputStream, DataInput inputStream) {
         output = outputStream;
         input = inputStream;
@@ -24,8 +19,9 @@ public class SyncTransport {
     public void send(String syncCommand, String name) throws IOException {
         if (syncCommand.length() != 4) throw new IllegalArgumentException("sync commands must have length 4");
         output.writeBytes(syncCommand);
-        output.writeInt(Integer.reverseBytes(name.length()));
-        output.writeBytes(name);
+        byte[] data = name.getBytes(StandardCharsets.UTF_8);
+        output.writeInt(Integer.reverseBytes(data.length));
+        output.write(data);
     }
 
     public void sendStatus(String statusCode, int length) throws IOException {
@@ -45,14 +41,29 @@ public class SyncTransport {
         }
     }
 
-    public int readInt() throws IOException {
+    private int readInt() throws IOException {
         return Integer.reverseBytes(input.readInt());
     }
 
-    public String readString(int length) throws IOException {
+    private String readString(int length) throws IOException {
         byte[] buffer = new byte[length];
         input.readFully(buffer);
-        return new String(buffer, Charset.forName("utf-8"));
+        return new String(buffer, StandardCharsets.UTF_8);
+    }
+
+    public void sendDirectoryEntry(RemoteFile file) throws IOException {
+        output.writeBytes("DENT");
+        output.writeInt(Integer.reverseBytes(0666 | (file.isDirectory() ? (1 << 14) : 0)));
+        output.writeInt(Integer.reverseBytes(file.getSize()));
+        output.writeInt(Integer.reverseBytes(file.getLastModified()));
+        byte[] pathChars = file.getPath().getBytes(StandardCharsets.UTF_8);
+        output.writeInt(Integer.reverseBytes(pathChars.length));
+        output.write(pathChars);
+    }
+
+    public void sendDirectoryEntryDone() throws IOException {
+        output.writeBytes("DONE");
+        output.writeBytes("\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"); // equivalent to the length of a "normal" dent
     }
 
     public RemoteFileRecord readDirectoryEntry() throws IOException {

@@ -1,6 +1,6 @@
 # Contributing #
 ## Why contributing? ##
-The original author and all users of this library are very greatful for your contribution
+The original author and all users of this library are very grateful for your contribution
 to this Open Source Project. Also most employers value people active in the Open Source
 community.
 
@@ -14,7 +14,7 @@ overall clean code.
 Before submitting a pull request, please go through the below checklist to verify
 your proposed change meets, or exceeds, the quality of the jadb source code.
 
-* Builds - Make sure the code builds by issuing `ant build`.
+* Builds - Make sure the code builds by issuing `mvn clean install test`.
 * Works - Make sure all the test runs and passes.
 * Works - Double check any features you might have changed, and of course any _new_ code
   by testing manually.
@@ -25,4 +25,4 @@ your proposed change meets, or exceeds, the quality of the jadb source code.
   full terse.
 * Newline at end of file - This makes `cat`-ing files, etc easier.
 
-Happy coding! I, the original author, and all users are greatful for your contribution. :-)
+Happy coding! I, the original author, and all users are grateful for your contribution. :-)
